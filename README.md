@@ -7,6 +7,7 @@ Features:
 -   [x] Status & response body size recorder (http.ResponseWriter)
 -   [x] RespondJSON / RespondText
 -   [x] HTTP router (based on gorilla/mux)
+-   [x] Generate XML sitemap from static website FS
 -   [ ] Panic recovery middleware
 -   [ ] Logging middleware
 -   [ ] Rate limiting middleware

@@ -9,57 +9,13 @@ import (
 	"testing/fstest"
 )
 
-func TestWebsiteHandlerConfig(t *testing.T) {
-	t.Parallel()
-
-	var validWebsiteHandlerConfig = WebsiteHandlerConfig{
-		Fsys: fstest.MapFS{
-			"404.html":      {Data: []byte("<h1>404</h1>")},
-			"index.html":    {Data: []byte("<h1>Home</h1>")},
-			"nested/app.js": {Data: []byte("export const c = null;")},
-		},
-		SubDir:           ".",
-		FallbackPagePath: "404.html",
-	}
-
-	t.Run("Should accept valid config", func(t *testing.T) {
-		if err := validWebsiteHandlerConfig.Validate(); err != nil {
-			t.Fatalf("got unexpected err %v", err)
-		}
-	})
-
-	t.Run("Should validate file system", func(t *testing.T) {
-		config := validWebsiteHandlerConfig // copy to avoid mutation
-		config.Fsys = nil                   // add invalid fsys
-		if err := config.Validate(); err == nil {
-			t.Fatal("wanted an error")
-		}
-	})
-
-	t.Run("Should validate sub directory", func(t *testing.T) {
-		config := validWebsiteHandlerConfig // copy to avoid mutation
-		config.SubDir = ""                  // add invalid sub dir
-		if err := config.Validate(); err == nil {
-			t.Fatal("wanted an error")
-		}
-	})
-
-	t.Run("Should validate fallback page", func(t *testing.T) {
-		config := validWebsiteHandlerConfig // copy to avoid mutation
-		config.FallbackPagePath = ""        // add invalid handler
-		if err := config.Validate(); err == nil {
-			t.Fatal("wanted an error")
-		}
-	})
-}
-
-func TestWebsiteHandler(t *testing.T) {
+func TestStaticWebsite(t *testing.T) {
 	t.Parallel()
 
 	sampleFileData := []byte("export const c = null;")
 	fallbackPageData := []byte("<h1>404</h1>")
 
-	var validWebsiteHandlerConfig = WebsiteHandlerConfig{
+	var validStaticWebsiteConfig = StaticWebsiteConfig{
 		Fsys: fstest.MapFS{
 			"index.html":    {Data: []byte("<h1>Home</h1>")},
 			"404.html":      {Data: fallbackPageData},
@@ -69,8 +25,12 @@ func TestWebsiteHandler(t *testing.T) {
 		FallbackPagePath: "404.html",
 	}
 
+	t.Run("Should implement http.Handler interface", func(t *testing.T) {
+		var _ http.Handler = (*StaticWebsite)(nil)
+	})
+
 	t.Run("Should serve static files from FS", func(t *testing.T) {
-		h, err := NewWebsiteHandler(validWebsiteHandlerConfig)
+		h, err := NewStaticWebsite(validStaticWebsiteConfig)
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -90,7 +50,7 @@ func TestWebsiteHandler(t *testing.T) {
 	})
 
 	t.Run("Should serve fallback page on 404", func(t *testing.T) {
-		h, err := NewWebsiteHandler(validWebsiteHandlerConfig)
+		h, err := NewStaticWebsite(validStaticWebsiteConfig)
 		if err != nil {
 			t.Fatalf("unexpected err %v", err)
 		}
@@ -107,6 +67,50 @@ func TestWebsiteHandler(t *testing.T) {
 		// check that body is fallback page content
 		if content, _ := ioutil.ReadAll(result.Body); !bytes.Equal(content, fallbackPageData) {
 			t.Fatalf("unexpected file content %v", content)
+		}
+	})
+}
+
+func TestStaticStaticWebsiteConfig(t *testing.T) {
+	t.Parallel()
+
+	var validDefaultHandler = StaticWebsiteConfig{
+		Fsys: fstest.MapFS{
+			"404.html":      {Data: []byte("<h1>404</h1>")},
+			"index.html":    {Data: []byte("<h1>Home</h1>")},
+			"nested/app.js": {Data: []byte("export const c = null;")},
+		},
+		SubDir:           ".",
+		FallbackPagePath: "404.html",
+	}
+
+	t.Run("Should accept valid config", func(t *testing.T) {
+		if err := validDefaultHandler.Validate(); err != nil {
+			t.Fatalf("got unexpected err %v", err)
+		}
+	})
+
+	t.Run("Should validate file system", func(t *testing.T) {
+		config := validDefaultHandler // mutate copy only
+		config.Fsys = nil             // add invalid fsys
+		if err := config.Validate(); err == nil {
+			t.Fatal("wanted an error")
+		}
+	})
+
+	t.Run("Should validate sub directory", func(t *testing.T) {
+		config := validDefaultHandler // copy to avoid mutation
+		config.SubDir = ""            // add invalid sub dir
+		if err := config.Validate(); err == nil {
+			t.Fatal("wanted an error")
+		}
+	})
+
+	t.Run("Should validate fallback page", func(t *testing.T) {
+		config := validDefaultHandler // copy to avoid mutation
+		config.FallbackPagePath = ""  // add invalid handler
+		if err := config.Validate(); err == nil {
+			t.Fatal("wanted an error")
 		}
 	})
 }

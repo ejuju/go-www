@@ -9,37 +9,34 @@ import (
 	"net/http/httptest"
 )
 
-// Handles static websites
-type WebsiteHandler struct {
-	fsys         fs.FS
+type StaticWebsite struct {
 	fileServer   http.Handler
 	fallbackHTML []byte
 }
 
-func (h *WebsiteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *StaticWebsite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Check if file server returns a 404 by passing
 	// a response recorder and not the true response writer
+	// If file is not found, serve fallback page
 	resrec := httptest.NewRecorder()
 	h.fileServer.ServeHTTP(resrec, r)
-
-	// If file is not found, serve fallback page
 	if resrec.Result().StatusCode == http.StatusNotFound {
 		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(h.fallbackHTML))
+		w.Write(h.fallbackHTML)
 		return
 	}
 
 	h.fileServer.ServeHTTP(w, r)
 }
 
-type WebsiteHandlerConfig struct {
+type StaticWebsiteConfig struct {
 	Fsys             fs.FS  // static file system
 	SubDir           string // "." for current directory
 	FallbackPagePath string // ex: "404.html"
 }
 
-func (c WebsiteHandlerConfig) Validate() error {
+func (c StaticWebsiteConfig) Validate() error {
 	switch {
 	default:
 		return nil
@@ -53,7 +50,7 @@ func (c WebsiteHandlerConfig) Validate() error {
 }
 
 // subFS: Set it to "." for current dir
-func NewWebsiteHandler(c WebsiteHandlerConfig) (http.Handler, error) {
+func NewStaticWebsite(c StaticWebsiteConfig) (*StaticWebsite, error) {
 	// Get sub directory where static files are
 	websiteFS, err := fs.Sub(c.Fsys, c.SubDir)
 	if err != nil {
@@ -71,9 +68,12 @@ func NewWebsiteHandler(c WebsiteHandlerConfig) (http.Handler, error) {
 		return nil, fmt.Errorf("failed to read fallback page content: %w", err)
 	}
 
-	return &WebsiteHandler{
+	return &StaticWebsite{
 		fileServer:   http.FileServer(http.FS(websiteFS)),
-		fsys:         websiteFS,
 		fallbackHTML: fallbackPageData,
 	}, nil
+}
+
+func (sw *StaticWebsite) HTTPHandler() (string, http.Handler) {
+	return "/", sw
 }

@@ -2,6 +2,8 @@ package www
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -44,4 +46,23 @@ func (w *Recorder) Write(data []byte) (int, error) {
 	num, err := w.ResponseWriter.Write(data)
 	w.NumBodyBytesWritten = num
 	return num, err
+}
+
+func NewHTTPAccessLogMiddleware(writeLogTo io.Writer) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Serve request and record response
+			resrec := &Recorder{ResponseWriter: w}
+			h.ServeHTTP(resrec, r)
+
+			// Log request URL, response status code and body size
+			logstr := fmt.Sprintf(
+				"HTTP %d %dB %q",
+				resrec.StatusCode,
+				resrec.NumBodyBytesWritten,
+				r.URL.Path,
+			)
+			w.Write([]byte(logstr))
+		})
+	}
 }
