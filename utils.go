@@ -46,9 +46,14 @@ func (w *Recorder) Write(data []byte) (int, error) {
 	return num, err
 }
 
-type AccessLogMiddlewareCallback func(statusCode int, numBytes int, path string)
+type AccessLogRequestData struct {
+	Path                string
+	IPAddr              string
+	StatusCode          int
+	NumBodyBytesWritten int
+}
 
-func NewHTTPAccessLogMiddleware(logfunc AccessLogMiddlewareCallback) func(http.Handler) http.Handler {
+func NewHTTPAccessLogMiddleware(cb func(AccessLogRequestData)) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Serve request and record response
@@ -56,11 +61,12 @@ func NewHTTPAccessLogMiddleware(logfunc AccessLogMiddlewareCallback) func(http.H
 			h.ServeHTTP(resrec, r)
 
 			// Log request URL, response status code and body size
-			logfunc(
-				resrec.StatusCode,
-				resrec.NumBodyBytesWritten,
-				r.URL.Path,
-			)
+			cb(AccessLogRequestData{
+				Path:                r.URL.Path,
+				IPAddr:              r.RemoteAddr,
+				StatusCode:          resrec.StatusCode,
+				NumBodyBytesWritten: resrec.NumBodyBytesWritten,
+			})
 		})
 	}
 }
